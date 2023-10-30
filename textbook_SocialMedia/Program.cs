@@ -1,9 +1,29 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using textbook_SocialMedia;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+//jwt token authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1), //used for solving system server clock and client server clock related issue
+            ValidIssuer = builder.Configuration["jwt:Issuer"],
+            ValidAudience = builder.Configuration["jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["jwt:Key"]))
+        };
+    });
+
+
 ConfigurationManager configuration = builder.Configuration;
 var connectionString = configuration.GetConnectionString("DefaultConnection");
 
