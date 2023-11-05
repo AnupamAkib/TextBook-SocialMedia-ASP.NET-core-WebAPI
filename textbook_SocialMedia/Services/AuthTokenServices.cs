@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -28,7 +29,7 @@ namespace textbook_SocialMedia.Services
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
             var token = new JwtSecurityToken(
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(10), //expire after 10 minutes
+                expires: DateTime.Now.AddMinutes(200), //expire after x minutes
                 signingCredentials: credentials
             );
             return new JwtSecurityTokenHandler().WriteToken(token);

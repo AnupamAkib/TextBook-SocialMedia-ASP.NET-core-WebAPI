@@ -1,7 +1,13 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using textbook_SocialMedia.Models;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+//using textbook_SocialMedia.Models;
+using textbook_SocialMedia.Models.Post;
 using textbook_SocialMedia.Payload.Request;
 using textbook_SocialMedia.Services;
 
@@ -11,22 +17,29 @@ namespace textbook_SocialMedia.Controllers
     [ApiController]
     public class PostController : ControllerBase
     {
-        DBContext _dbContext;
+        private DBContext _dbContext;
         public PostController(DBContext dBContext)
         {
             _dbContext = dBContext;
         }
 
+        [Authorize]
         [HttpPost]
         [Route("CreatePost")]
         public IActionResult CreatePost(PostRequest reqPost) 
         {
-            var userExist = _dbContext.Users.Where(u => u.UserName == reqPost.UserName).Any();
+            var _userName = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            var _userFullName = User.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var userExist = _dbContext.Users.Where(u => u.UserName == _userName).Any();
+
             if (userExist)
             {
                 Post post = new Post();
-                post.UserName = reqPost.UserName; //when JWT auth implemented, it will take username from token
+                post.UserName = _userName; 
+                post.UserFullName = _userFullName;
                 post.Content = reqPost.Content;
+                post.Privacy = reqPost.Privacy;
 
                 _dbContext.Posts.Add(post);
                 int rowAffected = _dbContext.SaveChanges();
@@ -42,22 +55,68 @@ namespace textbook_SocialMedia.Controllers
             }
             else
             {
-                return BadRequest(new {status = "failed", msg = "user doesn't exist"});
+                return BadRequest(new {status = "failed", msg = $"user {_userName} doesn't exist"});
             }
         }
 
+        [Authorize]
         [HttpPost]
-        [Route("GetPosts")]
-        public IActionResult GetPosts(string UserName)
+        [Route("GetUserPosts")]
+        public IActionResult GetUserPosts() //get all post of user who currently logged in
         {
-            var posts = _dbContext.Posts.Where(u => u.UserName == UserName);
+            var _userName = User.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value;
+
+            var posts = _dbContext.Posts.Where(u => u.UserName == _userName);
             if (posts.Any())
             {
                 return Ok(new {status = "success", PostFound = posts.Count(), posts});
             }
             else
             {
-                return NotFound(new {status="failed", msg = $"no posts found for user {UserName}"});
+                return NotFound(new {status="failed", msg = $"no posts found for user {_userName}"});
+            }
+        }
+
+        [Authorize]
+        [HttpPost]
+        [Route("LikeUnlike")]
+        public IActionResult LikeUnlike([FromQuery] int postID) //if already liked, it will unlike it & vice versa
+        {
+            var _userName = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            var _userFullName = User.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var _post = _dbContext.Posts.Where(p => p.PostID == postID).FirstOrDefault();
+            if (_post == null)
+            {
+                return NotFound(new
+                {
+                    status = "failed",
+                    msg = "post not found"
+                });
+            }
+            if(_post.Privacy == "Private" && _post.UserName != _userName) //user can like his own private post
+            {
+                return Unauthorized(new
+                {
+                    status = "failed",
+                    msg = "you are unauthorized to like"
+                });
+            }
+            else //post exist with postID & user can like/unlike
+            {
+                PostLike _like = new PostLike
+                {
+                    PostID = postID,
+                    UserName = _userName,
+                    UserFullName = _userFullName
+                };
+                _post.Likes.Add(_like);
+                _dbContext.SaveChanges();
+                return Ok(new
+                {
+                    status = "success",
+                    likeInfo = _like
+                });
             }
         }
     }

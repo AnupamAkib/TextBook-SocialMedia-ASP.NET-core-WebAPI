@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using textbook_SocialMedia.Models;
+using textbook_SocialMedia.Models.Post;
 
 namespace textbook_SocialMedia
 {

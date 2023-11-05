@@ -22,7 +22,7 @@ namespace textbook_SocialMedia.Controllers
         [HttpPost]
         public IActionResult Login(LoginRequest request)
         {
-            var user = _dbContext.Users.Where(u => u.UserName == request.UserName).FirstOrDefault();
+            var user = _dbContext.Users.Where(u => u.UserName == request.UserName.Trim()).FirstOrDefault();
             if (user != null)
             {
                 string token = _authTokenServices.GenerateToken(user);
