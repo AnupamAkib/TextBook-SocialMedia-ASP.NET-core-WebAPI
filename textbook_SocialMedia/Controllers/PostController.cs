@@ -60,13 +60,17 @@ namespace textbook_SocialMedia.Controllers
         }
 
         [Authorize]
-        [HttpPost]
+        [HttpGet]
         [Route("GetUserPosts")]
         public IActionResult GetUserPosts() //get all post of user who currently logged in
         {
             var _userName = User.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value;
 
-            var posts = _dbContext.Posts.Where(u => u.UserName == _userName);
+            var posts = _dbContext.Posts
+                .Where(u => u.UserName == _userName)
+                .Include(p => p.Likes)
+                .ToList();
+            
             if (posts.Any())
             {
                 return Ok(new {status = "success", PostFound = posts.Count(), posts});
@@ -91,7 +95,7 @@ namespace textbook_SocialMedia.Controllers
                 return NotFound(new
                 {
                     status = "failed",
-                    msg = "post not found"
+                    msg = "Post not found"
                 });
             }
             if(_post.Privacy == "Private" && _post.UserName != _userName) //user can like his own private post
@@ -99,24 +103,43 @@ namespace textbook_SocialMedia.Controllers
                 return Unauthorized(new
                 {
                     status = "failed",
-                    msg = "you are unauthorized to like"
+                    msg = "You are unauthorized, the post is private"
                 });
             }
             else //post exist with postID & user can like/unlike
             {
-                PostLike _like = new PostLike
+                var alreadyLikedPost = _dbContext.PostLikes
+                    .Where(_postlike => _postlike.PostID == postID && _postlike.UserName == _userName)
+                    .FirstOrDefault();
+
+                if (alreadyLikedPost != null)
                 {
-                    PostID = postID,
-                    UserName = _userName,
-                    UserFullName = _userFullName
-                };
-                _post.Likes.Add(_like);
-                _dbContext.SaveChanges();
-                return Ok(new
+                    _dbContext.PostLikes.Remove(alreadyLikedPost);
+                    _dbContext.SaveChanges();
+                    return Ok(new
+                    {
+                        status = "success",
+                        msg = "You unliked the post",
+                        unlikeInfo = alreadyLikedPost
+                    });
+                }
+                else
                 {
-                    status = "success",
-                    likeInfo = _like
-                });
+                    PostLike _like = new PostLike
+                    {
+                        PostID = postID,
+                        UserName = _userName,
+                        UserFullName = _userFullName
+                    };
+                    _dbContext.PostLikes.Add(_like);
+                    _dbContext.SaveChanges();
+                    return Ok(new
+                    {
+                        status = "success",
+                        msg = "You liked the post",
+                        likeInfo = _like
+                    });
+                }
             }
         }
     }
